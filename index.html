@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swara - Plumbing AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1e3a8a; /* Deep blue */
+            --secondary: #f97316; /* Orange accent */
+            --bg: #f1f5f9; /* Light slate background */
+            --card-bg: #ffffff;
+            --text: #0f172a; /* Dark slate */
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        h1 {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        #status {
+            font-size: 0.9rem;
+            color: #64748b;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        #infoForm {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        #infoForm p {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1rem;
+            margin: 0.75rem 0;
+        }
+
+        #infoForm span {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            max-width: 200px;
+            margin: 1rem auto;
+            padding: 0.75rem 1.5rem;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.3s ease, background 0.3s ease;
+        }
+
+        button:hover {
+            background: #ea580c;
+            transform: translateY(-2px);
+        }
+
+        #surveySection {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            #infoForm p {
+                flex-direction: column;
+                text-align: left;
+            }
+            table {
+                font-size: 0.8rem;
+            }
+            th, td {
+                padding: 0.5rem;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container, #infoForm, #surveySection {
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+            }
+            #status, #startSurvey {
+                display: none;
+            }
+            #surveySection {
+                display: block;
+            }
+            button {
+                display: none;
+            }
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+            #infoForm p {
+                font-size: 0.9rem;
+                margin: 0.25rem 0;
+            }
+            table {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Swara - Plumbing AI Assistant</h1>
+        <p id="status">Say "Hey Swara" to start...</p>
+        
+        <div id="infoForm">
+            <p><strong>Society Name:</strong> <span id="societyName">-</span></p>
+            <p><strong>Date:</strong> <span id="surveyDate">-</span></p>
+            <p><strong>Your Name:</strong> <span id="userName">-</span></p>
+            <button id="startSurvey" class="hidden">Start Survey</button>
+        </div>
+
+        <div id="surveySection" class="hidden">
+            <table id="materialTable">
+                <thead>
+                    <tr>
+                        <th>Size + Description</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody id="materialList"></tbody>
+            </table>
+            <button id="printBtn" onclick="printList()">Print List</button>
+        </div>
+    </div>
+
+    <script>
+        const status = document.getElementById('status');
+        const societyName = document.getElementById('societyName');
+        const surveyDate = document.getElementById('surveyDate');
+        const userName = document.getElementById('userName');
+        const startSurveyBtn = document.getElementById('startSurvey');
+        const surveySection = document.getElementById('surveySection');
+        const materialList = document.getElementById('materialList');
+
+        // DeepSeek API key
+        const API_KEY = 'sk-2ddd41ff2eb74ad58f5928e8932ffd9f';
+        const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+
+        // Voice recognition setup
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'hi-IN';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        let listening = false;
+        let stage = 'society';
+        let infoCollected = { society: '', date: '', name: '' };
+
+        // Size and unit mappings
+        const sizeMap = { 'adha': '1/2"', 'pona': '3/4"', 'ek': '1"', 'sava': '1 1/4"', 'dedh': '1 1/2"', 'do': '2"' };
+        const unitMap = { 'pipe': 'FT', 'coupling': 'Nos', 'elbow': 'Nos', 'tee': 'Nos', 'valve': 'Nos' };
+
+        // GSAP Animations
+        gsap.from('h1', { opacity: 0, y: -50, duration: 1, ease: 'power3.out' });
+        gsap.from('#infoForm', { opacity: 0, y: 50, duration: 1, delay: 0.5, ease: 'power3.out' });
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+            status.textContent = `Heard: "${transcript}"`;
+
+            if (transcript.includes('hey swara') && !listening) {
+                listening = true;
+                stage = 'society';
+                status.textContent = 'Swara is active! Please tell me the society name...';
+                return;
+            }
+
+            if (!listening) return;
+
+            if (transcript.includes('stop')) {
+                listening = false;
+                status.textContent = 'Swara stopped. Say "Hey Swara" to restart.';
+                return;
+            }
+
+            processInput(transcript);
+        };
+
+        recognition.onend = () => {
+            if (listening) recognition.start();
+        };
+
+        recognition.onerror = (event) => {
+            status.textContent = 'Error: ' + event.error;
+        };
+
+        function processInput(input) {
+            if (stage === 'society') {
+                infoCollected.society = input;
+                societyName.textContent = input;
+                stage = 'date';
+                status.textContent = 'Great! Now tell me the date (e.g., "20 March 2025")...';
+                gsap.to(societyName, { color: '#f97316', duration: 0.5 });
+            } else if (stage === 'date') {
+                infoCollected.date = input;
+                surveyDate.textContent = input;
+                stage = 'name';
+                status.textContent = 'Thanks! Now tell me your name...';
+                gsap.to(surveyDate, { color: '#f97316', duration: 0.5 });
+            } else if (stage === 'name') {
+                infoCollected.name = input;
+                userName.textContent = input;
+                stage = 'survey';
+                status.textContent = 'All set! Click "Start Survey" or say "start survey" to begin.';
+                startSurveyBtn.classList.remove('hidden');
+                gsap.to(userName, { color: '#f97316', duration: 0.5 });
+                gsap.from(startSurveyBtn, { opacity: 0, scale: 0.8, duration: 0.5, ease: 'back.out(1.7)' });
+            } else if (stage === 'survey') {
+                if (input.includes('start survey')) {
+                    startSurvey();
+                } else {
+                    processMaterialCommand(input);
+                }
+            }
+        }
+
+        function startSurvey() {
+            surveySection.classList.remove('hidden');
+            startSurveyBtn.classList.add('hidden');
+            status.textContent = 'Survey started! Tell me the material and quantity...';
+            gsap.from(surveySection, { opacity: 0, y: 50, duration: 1, ease: 'power3.out' });
+            ScrollTrigger.create({
+                trigger: surveySection,
+                start: 'top 80%',
+                onEnter: () => gsap.to('#materialTable', { opacity: 1, duration: 0.8 })
+            });
+        }
+
+        function processMaterialCommand(command) {
+            fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: 'You are Swara, an AI assistant for a plumbing section of a construction company. Users speak in Hindi colloquial terms: "adha" = 1/2", "pona" = 3/4", "ek" = 1", "sava" = 1 1/4", "dedh" = 1 1/2", "do" = 2". For pipes, interpret "feet" as "FT" and "nag" as "Nos" for quantity (e.g., "adha ka UPVC pipe 10 feet" = "1/2\" UPVC pipe - 10 FT", "adha ka UPVC pipe 10 nag" = "1/2\" UPVC pipe - 10 Nos"). Default to "FT" for pipes if no unit is specified. For other materials (e.g., coupling, elbow), use "Nos" by default. Respond with the list item only, like "1/2\" UPVC pipe - 10 FT" or "3/4\" UPVC coupling - 5 Nos".' },
+                        { role: 'user', content: command }
+                    ],
+                    max_tokens: 150
+                })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('API request failed');
+                return response.json();
+            })
+            .then(data => {
+                const aiResponse = data.choices[0].message.content.trim();
+                const [sizeDesc, quantity] = aiResponse.split(' - ');
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${sizeDesc}</td><td>${quantity}</td>`;
+                materialList.appendChild(row);
+                status.textContent = `Added: ${aiResponse}`;
+                gsap.from(row, { opacity: 0, x: -20, duration: 0.5, ease: 'power2.out' });
+            })
+            .catch(error => {
+                status.textContent = 'Sorry, something went wrong. Try again.';
+                console.error('Error:', error);
+            });
+        }
+
+        function printList() {
+            window.print();
+        }
+
+        recognition.start();
+    </script>
+</body>
+</html>
